@@ -13,4 +13,4 @@ Now you can easily find inactive friends or club members, delete friends and man
  - maciej.dariusz.gorczyca@gmail.com
  
 ## Donation
- The software is provided to you for free and is open sourced but if you think it's great or saved you few minutes (or hours if you are hardcore crafter), consider sending a donation: https://www.paypal.me/CoUsTme/1EUR
+ The software is provided to you for free and is open sourced but if you think it's great or saved you few minutes or hours, consider sending a donation: https://www.paypal.me/CoUsTme/1EUR
