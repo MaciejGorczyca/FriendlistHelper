@@ -51,16 +51,34 @@ namespace HexetchButBetter
                 return;
             }
             alreadyScannedPlayers = true;
+            JsonObject chatMe = await lc.Get("/lol-chat/v1/me");
+            String fromId = (String) chatMe["puuid"];
+            long fromSummonerId = (long) chatMe["summonerId"];
             JsonArray friends = (JsonArray) await lc.Get("/lol-chat/v1/friends");
             clearOutputPanel();
+            String msg = messageTextbox.Text;
             int i = 0;
             foreach (JsonObject friend in friends)
             {
+                await Task.Delay(3000);
                 Player player = new Player();
                 player.name = (String) friend["name"];
                 player.riotName = (String) friend["gameName"];
                 player.riotTag = (String) friend["gameTag"];
                 player.lastMatch = DateTime.MaxValue;
+                
+                String friendId = (String) friend["pid"];
+
+                try
+                {
+                    await sendMessage(fromId, fromSummonerId, friendId, msg);
+                }
+                catch (Exception exception)
+                {
+                    printPlayer(player, " error sending msg");
+                }
+                
+                /*
                 long id = (long) friend["summonerId"];
                 if (id != 0)
                 {
@@ -69,73 +87,9 @@ namespace HexetchButBetter
                     player.lastMatch = await getPlayerData(accountId);
                 }
                 players.Add(player);
+                */
+                
                 printPlayer(player, " " + ++i + "/" + friends.Count);
-            }
-            printData();
-        }
-
-        private async void button2_Click(object sender, EventArgs e)
-        {
-            if (!lc.IsConnected)
-            {
-                MessageBox.Show("Not connected to LCU! Start the game and wait few seconds.");
-                return;
-            }
-
-            if (alreadyScannedClublist)
-            {
-                MessageBox.Show("Already scanned clublist");
-                return;
-            }
-            else
-            {
-                alreadyScannedClublist = true;
-            }
-            
-            JsonArray clubs = (JsonArray) await lc.Get("/lol-clubs/v1/clubs");
-            foreach (JsonObject club in clubs)
-            {
-                String name = (String) club["name"];
-                String key = (String) club["key"];
-                clublist.Add(name, key);
-                comboBox1.Items.Add(name); 
-            }
-
-            comboBox1.SelectedIndex = 0;
-            
-            MessageBox.Show("Done");
-        }
-
-        private async void button3_Click(object sender, EventArgs e)
-        {
-            if (!lc.IsConnected)
-            {
-                MessageBox.Show("Not connected to LCU! Start the game and wait few seconds.");
-                return;
-            }
-            if (!alreadyScannedClublist)
-            {
-                MessageBox.Show("Scan clublist first");
-                return;
-            }
-            if (alreadyScannedPlayers)
-            {
-                MessageBox.Show("Already scanned players");
-                return;
-            }
-            alreadyScannedPlayers = true;
-            String selected = this.comboBox1.GetItemText(this.comboBox1.SelectedItem);
-            JsonArray members = (JsonArray) await lc.Get("/lol-clubs/v1/clubs/" + clublist[selected] + "/members");
-            clearOutputPanel();
-            int i = 0;
-            foreach (JsonObject member in members)
-            {
-                Player player = new Player();
-                player.name = (String) member["summonerName"];
-                long accountId = (long) member["accountId"];
-                player.lastMatch = await getPlayerData(accountId);
-                players.Add(player);
-                printPlayer(player, " " + ++i + "/" + members.Count);
             }
             printData();
         }
@@ -168,9 +122,13 @@ namespace HexetchButBetter
 
         private String prepareLabelString(Player player)
         {
-            String text = "";
+            String text = player.name;
+            
+            /*
             if (player.name != null && player.riotName != null) text += player.name + " ";
             text += player.lastMatch.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture);
+            */
+            
             return text;
         }
 
@@ -191,31 +149,14 @@ namespace HexetchButBetter
             outputPanel.Controls.Add(label);
         }
 
-        private async Task<DateTime> getPlayerData(long accountId)
+        private async Task sendMessage(String fromId, long fromSummonerId, String friendId, String msg)
         {
-            int i = 0;
-            while (true)
-            {
-                try
-                {
-                    JsonObject matchlists = (JsonObject) await lc.Get("/lol-match-history/v1/friend-matchlists/" + accountId);
-                    JsonArray games = (JsonArray) ((JsonObject) matchlists["games"])["games"];
-                    if (games.Count == 0) return DateTime.MinValue;
-                    JsonObject game = (JsonObject) games[games.Count - 1];
-                    String gameCreationDate = (String) game["gameCreationDate"];
-                    return DateTime.Parse(gameCreationDate, null, DateTimeStyles.RoundtripKind);
-                }
-                catch (Exception exception)
-                {
-                    if (++i > 3)    // the game occasionally throws error for some reason, retry up to 3 times
-                    {
-                        MessageBox.Show("Error retrieving matchlist data for player id " + accountId);
-                        return DateTime.MinValue;
-                    }
-                    Trace.WriteLine("Error while getting matchlist data, retrying");
-                    Thread.Sleep(500);
-                }
-            }
+            String timestamp = DateTime.UtcNow.ToString("s") + "Z";
+            
+            await lc.Post("/lol-chat/v1/conversations/" + friendId + "/messages",
+                "{\"type\":\"chat\",\"fromId\":\"" + fromId + "\",\"fromSummonerId\":" + fromSummonerId + ",\"isHistorical\":false,\"timestamp\":\"" + timestamp + "\",\"body\":\"" + msg + "\"}");
+            
+            //Trace.WriteLine("Sending msg " + msg + " to " + friendId);
         }
     }
 }
